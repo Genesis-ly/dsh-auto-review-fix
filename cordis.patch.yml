@@ -1,0 +1,31 @@
+# dsh-auto-review-fix bundle patch: inserts the plugin row.
+# Applied as a profile bundle layer through `dsh.bundle.patch`.
+#
+# The plugin wraps two Host services at mount:
+#   - ctx.llm.stream  → review calls (fixed REVIEW_POLICY prompt) stay on the
+#                       session's own route; only an unusable route is retried
+#                       once on the fixed fallback route;
+#   - tools/pre-execute (prepended) → an auto-review failure degrades to the
+#                       configured fallback instead of failing every tool call.
+- insert:
+    - id: dsh-auto-review-fix
+      name: dsh-auto-review-fix
+      config:
+        # Master switch. false restores the stock (buggy) behaviour.
+        enabled: true
+        # Which route serves review calls:
+        #   session (default) → the provider/model the session was configured with
+        #   fixed             → always use provider/model below
+        route: session
+        # Route used only when the session route cannot serve a review
+        # (provider error, STREAM_CLOSED, or output that breaks the fixed
+        # reasoning/text/JSON protocol). Empty string disables the fallback.
+        fallbackProvider: deepseek-account
+        fallbackModel: deepseek-flash
+        # Extra attempts on the primary route before falling back (0 disables).
+        retries: 0
+        # What to do when every route fails: ask | allow | deny.
+        # `ask` keeps the human gate — the normal approval prompt appears once.
+        fallback: ask
+        # One JSON line per route fallback / degraded call, for auditing.
+        auditPath: '~/.dsh/dsh-auto-review-fix/audit.jsonl'
